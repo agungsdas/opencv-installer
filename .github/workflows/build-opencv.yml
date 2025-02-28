@@ -1,0 +1,123 @@
+name: Build OpenCV for Multiple Platforms
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        arch: [amd64, arm64]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt update
+          sudo apt install -y cmake g++ wget unzip checkinstall curl jq qemu-user-static
+
+      - name: Install Dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          choco install cmake git python3
+
+      - name: Install Dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install cmake ninja pkg-config
+
+      - name: Fetch Latest OpenCV Version
+        id: get_version
+        run: |
+          OPENCV_VERSION=$(curl -s https://api.github.com/repos/opencv/opencv/releases/latest | jq -r '.tag_name')
+          echo "OpenCV latest version: $OPENCV_VERSION"
+          echo "version=$OPENCV_VERSION" >> "$GITHUB_ENV"
+
+      - name: Clone OpenCV Source
+        run: |
+          git clone --depth=1 --branch ${{ env.version }} https://github.com/opencv/opencv.git
+          git clone --depth=1 --branch ${{ env.version }} https://github.com/opencv/opencv_contrib.git
+          mkdir -p opencv/build
+
+      - name: Build OpenCV for Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cd opencv/build
+          cmake -D CMAKE_BUILD_TYPE=Release \
+                -D CMAKE_INSTALL_PREFIX=/usr/local \
+                -D OPENCV_EXTRA_MODULES_PATH=../../opencv_contrib/modules \
+                -D BUILD_opencv_aruco=ON ..
+          make -j$(nproc)
+
+      - name: Package OpenCV as `.deb`
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cd opencv/build
+          sudo checkinstall -D --install=no \
+                            --pkgname=opencv4-custom-${{ matrix.arch }} \
+                            --pkgversion=${{ env.version }} \
+                            --default
+          mv opencv4-custom-${{ matrix.arch }}_${{ env.version }}-1_${{ matrix.arch }}.deb ../../opencv-${{ matrix.arch }}.deb
+
+      - name: Build OpenCV for Windows
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd opencv/build
+          cmake -G "Visual Studio 17 2022" -A x64 -D OPENCV_EXTRA_MODULES_PATH=../../opencv_contrib/modules ..
+          cmake --build . --config Release --target install
+
+      - name: Package OpenCV as `.msi`
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd opencv/build
+          cpack -G WIX
+          mv OpenCV*.msi ../../opencv-windows-x64.msi
+
+      - name: Build OpenCV for macOS
+        if: matrix.os == 'macos-latest'
+        run: |
+          cd opencv/build
+          cmake -G "Unix Makefiles" -D CMAKE_BUILD_TYPE=Release \
+                -D OPENCV_EXTRA_MODULES_PATH=../../opencv_contrib/modules ..
+          make -j$(sysctl -n hw.ncpu)
+
+      - name: Package OpenCV as `.pkg`
+        if: matrix.os == 'macos-latest'
+        run: |
+          cd opencv/build
+          sudo make install
+          pkgbuild --root /usr/local --identifier org.opencv.pkg --version ${{ env.version }} ../../opencv-macos.pkg
+
+      - name: Upload to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=${{ env.version }}
+          RELEASE_NAME="OpenCV $TAG Build"
+
+          echo "Checking if release exists..."
+          if ! gh release view "$TAG"; then
+            echo "Creating new release..."
+            gh release create "$TAG" \
+              --title "$RELEASE_NAME" \
+              --notes "Latest OpenCV build with ArUco support" \
+              --repo ${{ github.repository }} \
+              --prerelease
+          fi
+
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            gh release upload "$TAG" opencv-${{ matrix.arch }}.deb --clobber
+          elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            gh release upload "$TAG" opencv-windows-x64.msi --clobber
+          elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            gh release upload "$TAG" opencv-macos.pkg --clobber
+          fi
