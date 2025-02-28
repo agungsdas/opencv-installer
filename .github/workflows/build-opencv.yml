@@ -56,7 +56,7 @@ jobs:
                 -D CMAKE_INSTALL_PREFIX=/usr/local \
                 -D OPENCV_EXTRA_MODULES_PATH=../../opencv_contrib/modules \
                 -D BUILD_opencv_aruco=OFF ..  # Disable ArUco
-          make -j$(nproc)
+          make -j2
 
       - name: Package OpenCV as `.deb`
         if: matrix.os == 'ubuntu-latest'
