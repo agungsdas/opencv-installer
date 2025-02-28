@@ -121,9 +121,9 @@ jobs:
             --prerelease
 
           if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
-            gh release upload "$TAG" opencv-${{ matrix.arch }}.deb --clobber
+            gh release upload "$TAG" "opencv-${{ env.version }}-${{ matrix.os }}-${{ matrix.arch }}.deb" --clobber
           elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            gh release upload "$TAG" opencv-windows-x64.msi --clobber
+            gh release upload "$TAG" "opencv-${{ env.version }}-${{ matrix.os }}-${{ matrix.arch }}.msi" --clobber
           elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
-            gh release upload "$TAG" opencv-macos.pkg --clobber
+            gh release upload "$TAG" "opencv-${{ env.version }}-${{ matrix.os }}-${{ matrix.arch }}.pkg" --clobber
           fi
