@@ -39,16 +39,12 @@ jobs:
         run: |
           brew install cmake ninja pkg-config
 
-      - name: Install jq (macOS)
-        if: runner.os == 'macOS'
-        run: brew install jq
-        
-      - name: Fetch Latest OpenCV Version
-        id: get_version
+      - name: Set OpenCV Version
         run: |
-          OPENCV_VERSION=$(curl -s https://api.github.com/repos/opencv/opencv/releases/latest | jq -r '.tag_name')
-          echo "OpenCV latest version: $OPENCV_VERSION"
+          OPENCV_VERSION="4.11.0"
+          echo "OpenCV version: $OPENCV_VERSION"
           echo "version=$OPENCV_VERSION" >> "$GITHUB_ENV"
+
 
       - name: Clone OpenCV Source
         run: |
