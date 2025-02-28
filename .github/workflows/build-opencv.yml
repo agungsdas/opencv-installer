@@ -39,12 +39,12 @@ jobs:
         run: |
           brew install cmake ninja pkg-config
 
-      - name: Set OpenCV Version
+      - name: Set OpenCV Version (Cross-Platform)
+        shell: bash  # Forces Bash, even on Windows
         run: |
           OPENCV_VERSION="4.11.0"
           echo "OpenCV version: $OPENCV_VERSION"
           echo "version=$OPENCV_VERSION" >> "$GITHUB_ENV"
-
 
       - name: Clone OpenCV Source
         run: |
