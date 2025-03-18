@@ -54,21 +54,22 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           cd opencv/build
-          cmake -G Ninja -D CMAKE_BUILD_TYPE=Release \
+          cmake -D CMAKE_BUILD_TYPE=Release \
                 -D CMAKE_INSTALL_PREFIX=/usr/local \
                 -D OPENCV_EXTRA_MODULES_PATH=../../opencv_contrib/modules \
-                -D BUILD_opencv_aruco=OFF ..
-          ninja
-          sudo ninja install
+                -D BUILD_opencv_aruco=OFF ..  # Disable ArUco
+          make -j$(nproc)
 
       - name: Package OpenCV as `.deb`
         if: matrix.os == 'ubuntu-latest'
         run: |
           cd opencv/build
+          sudo make DESTDIR=$(pwd)/install install  # ✅ Install to a temporary directory
           sudo checkinstall -D --install=no \
                             --pkgname=opencv4-custom-${{ matrix.arch }} \
                             --pkgversion=${{ env.version }} \
-                            --default
+                            --default \
+                            --pakdir=$(pwd)/install
           mv opencv4-custom-${{ matrix.arch }}_${{ env.version }}-1_${{ matrix.arch }}.deb ../../opencv-${{ matrix.arch }}.deb
 
       - name: Build OpenCV for Windows
