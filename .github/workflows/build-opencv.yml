@@ -10,8 +10,10 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest]
         arch: [amd64, arm64]
+        # os: [ubuntu-latest, windows-latest, macos-latest]
+        # arch: [amd64, arm64]
 
     runs-on: ${{ matrix.os }}
 
@@ -57,20 +59,22 @@ jobs:
           cmake -D CMAKE_BUILD_TYPE=Release \
                 -D CMAKE_INSTALL_PREFIX=/usr/local \
                 -D OPENCV_EXTRA_MODULES_PATH=../../opencv_contrib/modules \
-                -D BUILD_opencv_aruco=OFF ..  # Disable ArUco
+                -D BUILD_opencv_aruco=OFF \
+                -D BUILD_opencv_objdetect=OFF ..  # Ensure ArUco is fully excluded
           make -j$(nproc)
 
       - name: Package OpenCV as `.deb`
         if: matrix.os == 'ubuntu-latest'
         run: |
           cd opencv/build
-          sudo make DESTDIR=$(pwd)/install install  # ✅ Install to a temporary directory
+          sudo make DESTDIR=$(pwd)/install install
           sudo checkinstall -D --install=no \
                             --pkgname=opencv4-custom-${{ matrix.arch }} \
                             --pkgversion=${{ env.version }} \
                             --default \
-                            --pakdir=$(pwd)/install
-          mv opencv4-custom-${{ matrix.arch }}_${{ env.version }}-1_${{ matrix.arch }}.deb ../../opencv-${{ matrix.arch }}.deb
+                            --pakdir=$(pwd)/install || { echo "Error: checkinstall failed"; exit 1; }
+          ls -lh $(pwd)/install  # Debugging step to check the actual file name
+          mv $(ls opencv4-custom-${{ matrix.arch }}_*.deb) ../../opencv-${{ matrix.arch }}.deb
 
       - name: Build OpenCV for Windows
         if: matrix.os == 'windows-latest'
